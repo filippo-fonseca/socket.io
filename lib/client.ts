@@ -1,32 +1,36 @@
 import { Decoder, Encoder, Packet, PacketType } from "socket.io-parser";
 import debugModule = require("debug");
-import { IncomingMessage } from "http";
-import { Server } from "./index";
-import { Socket } from "./socket";
-import { SocketId } from "socket.io-adapter";
-import { ParentNamespace } from "./parent-namespace";
+import url = require("url");
+import type { IncomingMessage } from "http";
+import type { Namespace, Server } from "./index";
+import type { EventsMap } from "./typed-events";
+import type { Socket } from "./socket";
+import type { SocketId } from "socket.io-adapter";
 
 const debug = debugModule("socket.io:client");
 
-export class Client {
+export class Client<
+  ListenEvents extends EventsMap,
+  EmitEvents extends EventsMap
+> {
   public readonly conn;
 
   private readonly id: string;
-  private readonly server: Server;
+  private readonly server: Server<ListenEvents, EmitEvents>;
   private readonly encoder: Encoder;
   private readonly decoder: Decoder;
-  private sockets: Map<SocketId, Socket> = new Map();
-  private nsps: Map<string, Socket> = new Map();
-  private connectTimeout: NodeJS.Timeout;
+  private sockets: Map<SocketId, Socket<ListenEvents, EmitEvents>> = new Map();
+  private nsps: Map<string, Socket<ListenEvents, EmitEvents>> = new Map();
+  private connectTimeout?: NodeJS.Timeout;
 
   /**
    * Client constructor.
    *
-   * @param {Server} server instance
-   * @param {Socket} conn
+   * @param server instance
+   * @param conn
    * @package
    */
-  constructor(server: Server, conn) {
+  constructor(server: Server<ListenEvents, EmitEvents>, conn: any) {
     this.server = server;
     this.conn = conn;
     this.encoder = server.encoder;
@@ -78,47 +82,52 @@ export class Client {
    * @param {Object} auth - the auth parameters
    * @private
    */
-  private connect(name: string, auth: object = {}) {
+  private connect(name: string, auth: object = {}): void {
     if (this.server._nsps.has(name)) {
       debug("connecting to namespace %s", name);
       return this.doConnect(name, auth);
     }
 
-    this.server._checkNamespace(name, auth, (dynamicNsp: ParentNamespace) => {
-      if (dynamicNsp) {
-        debug("dynamic namespace %s was created", dynamicNsp.name);
-        this.doConnect(name, auth);
-      } else {
-        debug("creation of namespace %s was denied", name);
-        this._packet({
-          type: PacketType.CONNECT_ERROR,
-          nsp: name,
-          data: {
-            message: "Invalid namespace"
-          }
-        });
+    this.server._checkNamespace(
+      name,
+      auth,
+      (dynamicNspName: Namespace<ListenEvents, EmitEvents> | false) => {
+        if (dynamicNspName) {
+          debug("dynamic namespace %s was created", dynamicNspName);
+          this.doConnect(name, auth);
+        } else {
+          debug("creation of namespace %s was denied", name);
+          this._packet({
+            type: PacketType.CONNECT_ERROR,
+            nsp: name,
+            data: {
+              message: "Invalid namespace",
+            },
+          });
+        }
       }
-    });
+    );
   }
 
   /**
    * Connects a client to a namespace.
    *
-   * @param {String} name - the namespace
+   * @param name - the namespace
    * @param {Object} auth - the auth parameters
    *
    * @private
    */
-  private doConnect(name: string, auth: object) {
-    if (this.connectTimeout) {
-      clearTimeout(this.connectTimeout);
-      this.connectTimeout = null;
-    }
+  private doConnect(name: string, auth: object): void {
     const nsp = this.server.of(name);
 
     const socket = nsp._add(this, auth, () => {
       this.sockets.set(socket.id, socket);
       this.nsps.set(nsp.name, socket);
+
+      if (this.connectTimeout) {
+        clearTimeout(this.connectTimeout);
+        this.connectTimeout = undefined;
+      }
     });
   }
 
@@ -127,7 +136,7 @@ export class Client {
    *
    * @private
    */
-  _disconnect() {
+  _disconnect(): void {
     for (const socket of this.sockets.values()) {
       socket.disconnect();
     }
@@ -140,9 +149,9 @@ export class Client {
    *
    * @private
    */
-  _remove(socket: Socket) {
+  _remove(socket: Socket<ListenEvents, EmitEvents>): void {
     if (this.sockets.has(socket.id)) {
-      const nsp = this.sockets.get(socket.id).nsp.name;
+      const nsp = this.sockets.get(socket.id)!.nsp.name;
       this.sockets.delete(socket.id);
       this.nsps.delete(nsp);
     } else {
@@ -155,8 +164,8 @@ export class Client {
    *
    * @private
    */
-  private close() {
-    if ("open" == this.conn.readyState) {
+  private close(): void {
+    if ("open" === this.conn.readyState) {
       debug("forcing transport close");
       this.conn.close();
       this.onclose("forced server close");
@@ -170,19 +179,20 @@ export class Client {
    * @param {Object} opts
    * @private
    */
-  _packet(packet, opts?) {
+  _packet(packet: Packet, opts?: any): void {
     opts = opts || {};
     const self = this;
 
     // this writes to the actual connection
-    function writeToEngine(encodedPackets) {
+    function writeToEngine(encodedPackets: any) {
+      // TODO clarify this.
       if (opts.volatile && !self.conn.transport.writable) return;
       for (let i = 0; i < encodedPackets.length; i++) {
         self.conn.write(encodedPackets[i], { compress: opts.compress });
       }
     }
 
-    if ("open" == this.conn.readyState) {
+    if ("open" === this.conn.readyState) {
       debug("writing packet %j", packet);
       if (!opts.preEncoded) {
         // not broadcasting, need to encode
@@ -201,7 +211,7 @@ export class Client {
    *
    * @private
    */
-  private ondata(data) {
+  private ondata(data): void {
     // try/catch is needed for protocol violations (GH-1880)
     try {
       this.decoder.add(data);
@@ -215,13 +225,18 @@ export class Client {
    *
    * @private
    */
-  private ondecoded(packet: Packet) {
-    if (PacketType.CONNECT == packet.type) {
-      this.connect(packet.nsp, packet.data);
+  private ondecoded(packet: Packet): void {
+    if (PacketType.CONNECT === packet.type) {
+      if (this.conn.protocol === 3) {
+        const parsed = url.parse(packet.nsp, true);
+        this.connect(parsed.pathname!, parsed.query);
+      } else {
+        this.connect(packet.nsp, packet.data);
+      }
     } else {
       const socket = this.nsps.get(packet.nsp);
       if (socket) {
-        process.nextTick(function() {
+        process.nextTick(function () {
           socket._onpacket(packet);
         });
       } else {
@@ -236,7 +251,7 @@ export class Client {
    * @param {Object} err object
    * @private
    */
-  private onerror(err) {
+  private onerror(err): void {
     for (const socket of this.sockets.values()) {
       socket._onerror(err);
     }
@@ -249,7 +264,7 @@ export class Client {
    * @param reason
    * @private
    */
-  private onclose(reason: string) {
+  private onclose(reason: string): void {
     debug("client close with reason %s", reason);
 
     // ignore a potential subsequent `close` event
@@ -268,11 +283,16 @@ export class Client {
    * Cleans up event listeners.
    * @private
    */
-  private destroy() {
+  private destroy(): void {
     this.conn.removeListener("data", this.ondata);
     this.conn.removeListener("error", this.onerror);
     this.conn.removeListener("close", this.onclose);
     // @ts-ignore
     this.decoder.removeListener("decoded", this.ondecoded);
+
+    if (this.connectTimeout) {
+      clearTimeout(this.connectTimeout);
+      this.connectTimeout = undefined;
+    }
   }
 }

@@ -1,3 +1,69 @@
+# [4.0.0](https://github.com/socketio/socket.io/compare/3.1.2...4.0.0) (2021-03-10)
+
+
+### Bug Fixes
+
+* make io.to(...) immutable ([ac9e8ca](https://github.com/socketio/socket.io/commit/ac9e8ca6c71e00d4af45ee03f590fe56f3951186))
+
+
+### Features
+
+* add some utility methods ([b25495c](https://github.com/socketio/socket.io/commit/b25495c069031674da08e19aed68922c7c7a0e28))
+* add support for typed events ([#3822](https://github.com/socketio/socket.io/issues/3822)) ([0107510](https://github.com/socketio/socket.io/commit/0107510ba8a0f148c78029d8be8919b350feb633))
+* allow to exclude specific rooms when broadcasting ([#3789](https://github.com/socketio/socket.io/issues/3789)) ([7de2e87](https://github.com/socketio/socket.io/commit/7de2e87e888d849eb2dfc5e362af4c9e86044701))
+* allow to pass an array to io.to(...) ([085d1de](https://github.com/socketio/socket.io/commit/085d1de9df909651de8b313cc6f9f253374b702e))
+
+
+## [3.1.2](https://github.com/socketio/socket.io/compare/3.1.1...3.1.2) (2021-02-26)
+
+
+### Bug Fixes
+
+* ignore packets received after disconnection ([494c64e](https://github.com/socketio/socket.io/commit/494c64e44f645cbd24c645f1186d203789e84af0))
+
+
+## [3.1.1](https://github.com/socketio/socket.io/compare/3.1.0...3.1.1) (2021-02-03)
+
+
+### Bug Fixes
+
+* properly parse the CONNECT packet in v2 compatibility mode ([6f4bd7f](https://github.com/socketio/socket.io/commit/6f4bd7f8e7c41a075a8014565330a77c38b03a8d))
+* **typings:** add return types and general-case overload signatures ([#3776](https://github.com/socketio/socket.io/issues/3776)) ([9e8f288](https://github.com/socketio/socket.io/commit/9e8f288ca9f14f91064b8d3cce5946f7d23d407c))
+* **typings:** update the types of "query", "auth" and "headers" ([4f2e9a7](https://github.com/socketio/socket.io/commit/4f2e9a716d9835b550c8fd9a9b429ebf069c2895))
+
+
+# [3.1.0](https://github.com/socketio/socket.io/compare/3.0.5...3.1.0) (2021-01-15)
+
+
+### Features
+
+* confirm a weak but matching ETag ([#3485](https://github.com/socketio/socket.io/issues/3485)) ([161091d](https://github.com/socketio/socket.io/commit/161091dd4c9e1b1610ac3d45d964195e63d92b94))
+* **esm:** export the Namespace and Socket class ([#3699](https://github.com/socketio/socket.io/issues/3699)) ([233650c](https://github.com/socketio/socket.io/commit/233650c22209708b5fccc4349c38d2fa1b465d8f))
+* add support for Socket.IO v2 clients ([9925746](https://github.com/socketio/socket.io/commit/9925746c8ee3a6522bd640b5d586c83f04f2f1ba))
+* add room events ([155fa63](https://github.com/socketio/socket.io-adapter/commit/155fa6333a504036e99a33667dc0397f6aede25e))
+
+
+### Bug Fixes
+
+* allow integers as event names ([1c220dd](https://github.com/socketio/socket.io-parser/commit/1c220ddbf45ea4b44bc8dbf6f9ae245f672ba1b9))
+
+
+## [3.0.5](https://github.com/socketio/socket.io/compare/3.0.4...3.0.5) (2021-01-05)
+
+
+### Bug Fixes
+
+* properly clear timeout on connection failure ([170b739](https://github.com/socketio/socket.io/commit/170b739f147cb6c92b423729b877e242e376927d))
+
+
+### Reverts
+
+* restore the socket middleware functionality ([bf54327](https://github.com/socketio/socket.io/commit/bf5432742158e4d5ba2722cff4a614967dffa5b9))
+
+
+## [3.0.4](https://github.com/socketio/socket.io/compare/3.0.3...3.0.4) (2020-12-07)
+
+
 ## [3.0.3](https://github.com/socketio/socket.io/compare/3.0.2...3.0.3) (2020-11-19)
 
 

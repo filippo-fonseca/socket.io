@@ -1,36 +1,55 @@
 import { Namespace } from "./namespace";
+import type { Server } from "./index";
+import type {
+  EventParams,
+  EventNames,
+  EventsMap,
+  DefaultEventsMap,
+} from "./typed-events";
+import type { BroadcastOptions } from "socket.io-adapter";
 
-export class ParentNamespace extends Namespace {
+export class ParentNamespace<
+  ListenEvents extends EventsMap = DefaultEventsMap,
+  EmitEvents extends EventsMap = ListenEvents
+> extends Namespace<ListenEvents, EmitEvents> {
   private static count: number = 0;
-  private children: Set<Namespace> = new Set();
+  private children: Set<Namespace<ListenEvents, EmitEvents>> = new Set();
 
-  constructor(server) {
+  constructor(server: Server<ListenEvents, EmitEvents>) {
     super(server, "/_" + ParentNamespace.count++);
   }
 
-  _initAdapter() {}
+  /**
+   * @private
+   */
+  _initAdapter(): void {
+    const broadcast = (packet: any, opts: BroadcastOptions) => {
+      this.children.forEach((nsp) => {
+        nsp.adapter.broadcast(packet, opts);
+      });
+    };
+    // @ts-ignore FIXME is there a way to declare an inner class in TypeScript?
+    this.adapter = { broadcast };
+  }
 
-  public emit(...args: any[]): boolean {
-    this.children.forEach(nsp => {
-      nsp._rooms = this._rooms;
-      nsp._flags = this._flags;
-      nsp.emit.apply(nsp, args);
+  public emit<Ev extends EventNames<EmitEvents>>(
+    ev: Ev,
+    ...args: EventParams<EmitEvents, Ev>
+  ): true {
+    this.children.forEach((nsp) => {
+      nsp.emit(ev, ...args);
     });
-    this._rooms.clear();
-    this._flags = {};
 
     return true;
   }
 
-  createChild(name) {
+  createChild(name: string): Namespace<ListenEvents, EmitEvents> {
     const namespace = new Namespace(this.server, name);
     namespace._fns = this._fns.slice(0);
-    this.listeners("connect").forEach(listener =>
-      // @ts-ignore
+    this.listeners("connect").forEach((listener) =>
       namespace.on("connect", listener)
     );
-    this.listeners("connection").forEach(listener =>
-      // @ts-ignore
+    this.listeners("connection").forEach((listener) =>
       namespace.on("connection", listener)
     );
     this.children.add(namespace);
